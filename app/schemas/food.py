@@ -1,12 +1,12 @@
 from datetime import datetime
-
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
+from sqlalchemy.orm import Session
 
 
 class FoodCreate(BaseModel):
-    name: str
-    category_large: str
-    category_small: str
+    name: str = Field(..., description="食物名称")
+    category_large: str = Field(..., examples=["蔬菜"], description="大分类名称")
+    category_small: str = Field(..., examples=["叶菜"], description="小分类名称")
     expiry_days: int
     photo_path: str
 

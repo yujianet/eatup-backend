@@ -2,30 +2,43 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
-from ..models import Food
+from ..models import Food, Category
 from ..database import get_db
 import shutil
 from datetime import datetime, timedelta
 from ..schemas.food import FoodResponse, FoodCreate, FoodQueryParams
-from fastapi import Body
 
 router = APIRouter(prefix="/foods", tags=["foods"])
 
 
-# 创建食物
-@router.post("/")
+@router.post("/", status_code=201)
 def create_food(
-        food_data: FoodCreate = Body(...),  # 使用请求体模型
+        food_data: FoodCreate,
         db: Session = Depends(get_db)
 ):
+    """创建食物"""
+    # 验证分类是否存在
+    category = db.query(Category).filter(
+        Category.large_category == food_data.category_large,
+        Category.small_category == food_data.category_small
+    ).first()
+
+    if not category:
+        raise HTTPException(
+            status_code=400,
+            detail=f"无效分类组合"
+        )
+
+    # 创建食物记录
     db_food = Food(
         name=food_data.name,
         category_large=food_data.category_large,
         category_small=food_data.category_small,
         expiry_days=food_data.expiry_days,
         photo_path=food_data.photo_path,
-        storage_time=datetime.now()  # 自动添加时间戳
+        storage_time=datetime.now()
     )
+
     db.add(db_food)
     db.commit()
     db.refresh(db_food)
@@ -40,6 +53,7 @@ ALLOWED_TYPES = ["image/jpeg", "image/png"]
 async def upload_image(file: UploadFile = File(...)):
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(400, "仅支持JPEG/PNG格式")
+
     # 生成唯一文件名：时间戳_原文件名
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     filename = f"{timestamp}_{file.filename}"
@@ -52,13 +66,13 @@ async def upload_image(file: UploadFile = File(...)):
     return {"filename": filename, "path": save_path}
 
 
-# 获取食物列表
 @router.get("/", summary="获取食物列表（分页排序）",
             description="支持排序字段：storage_time（入库时间）, expiry_days（保质期天数）, remaining_days（剩余天数）")
 def get_foods(
         query: FoodQueryParams = Depends(),
         db: Session = Depends(get_db)
 ):
+    """获取食物列表"""
     # 参数验证
     valid_sort_fields = ["storage_time", "expiry_days", "remaining_days"]
     if query.sort_by not in valid_sort_fields:
@@ -108,11 +122,9 @@ def get_foods(
     # 将SQLAlchemy模型转换为Pydantic响应模型
     response_data = []
     for food in foods:
-        storage_time: datetime = food.storage_time  # 实际类型是 datetime.datetime
-        expiry_date: datetime = storage_time + timedelta(days=food.expiry_days)
-        remaining_days = (expiry_date - datetime.now()).days  # 无类型错误
+        expiry_date = food.storage_time + timedelta(days=food.expiry_days)
+        remaining_days = (expiry_date - datetime.now()).days
 
-        # 转换为FoodResponse
         response_data.append(FoodResponse(
             id=food.id,
             name=food.name,
@@ -121,7 +133,7 @@ def get_foods(
             expiry_days=food.expiry_days,
             photo_path=food.photo_path,
             storage_time=food.storage_time,
-            remaining_days=remaining_days  # 动态计算字段
+            remaining_days=remaining_days
         ))
 
     return {
@@ -133,3 +145,53 @@ def get_foods(
             "total_pages": (total + query.page_size - 1) // query.page_size
         }
     }
+
+
+@router.get("/{food_id}", response_model=FoodResponse)
+def get_food_detail(
+        food_id: int,
+        db: Session = Depends(get_db)
+):
+    """获取单个食物详情"""
+    # 查询食物
+    db_food = db.query(Food).filter(Food.id == food_id).first()
+
+    if not db_food:
+        raise HTTPException(status_code=404, detail="食物不存在")
+
+    # 计算剩余天数
+    expiry_date = db_food.storage_time + timedelta(days=db_food.expiry_days)
+    remaining_days = (expiry_date - datetime.now()).days
+
+    return FoodResponse(
+        id=db_food.id,
+        name=db_food.name,
+        category_large=db_food.category_large,
+        category_small=db_food.category_small,
+        expiry_days=db_food.expiry_days,
+        photo_path=db_food.photo_path,
+        storage_time=db_food.storage_time,
+        remaining_days=remaining_days
+    )
+
+
+@router.delete("/{food_id}")
+def delete_food(
+        food_id: int,
+        db: Session = Depends(get_db)
+):
+    """删除指定食物"""
+    # 查询食物是否存在
+    db_food = db.query(Food).filter(Food.id == food_id).first()
+    if not db_food:
+        raise HTTPException(status_code=404, detail="食物不存在")
+
+    # 执行删除操作
+    try:
+        db.delete(db_food)
+        db.commit()
+    except OperationalError as e:
+        db.rollback()
+        raise HTTPException(500, f"数据库操作失败: {str(e)}")
+
+    return {"message": "食物删除成功"}
