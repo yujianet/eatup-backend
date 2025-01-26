@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from .database import engine
 from .models import Food
 from .routers import food, category
@@ -11,3 +12,4 @@ app = FastAPI()
 # 挂载子路由
 app.include_router(food.router)
 app.include_router(category.router)
+app.mount("/static", StaticFiles(directory="static"), name="static")
