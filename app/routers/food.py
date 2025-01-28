@@ -84,6 +84,10 @@ def get_foods(
     # 构建基础查询
     base_query = db.query(Food)
 
+    # 根据 include_deleted 参数调整查询条件
+    if not query.include_deleted:
+        base_query = base_query.filter(Food.is_deleted == False)
+
     # 处理剩余天数排序
     if query.sort_by == "remaining_days":
         # 使用SQLAlchemy核心表达式
@@ -117,7 +121,10 @@ def get_foods(
         foods = result
 
     # 获取总数（需要独立查询）
-    total = db.query(func.count(Food.id)).scalar()
+    total_query = db.query(func.count(Food.id))
+    if not query.include_deleted:
+        total_query = total_query.filter(Food.is_deleted == False)
+    total = total_query.scalar()
 
     # 将SQLAlchemy模型转换为Pydantic响应模型
     response_data = []
@@ -186,9 +193,9 @@ def delete_food(
     if not db_food:
         raise HTTPException(status_code=404, detail="食物不存在")
 
-    # 执行删除操作
+    # 执行软删除操作
     try:
-        db.delete(db_food)
+        db_food.is_deleted = True  # 更新软删除字段
         db.commit()
     except OperationalError as e:
         db.rollback()

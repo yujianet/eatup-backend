@@ -22,6 +22,7 @@ class FoodQueryParams(BaseModel):
     page_size: int = 10
     sort_by: str = "storage_time"
     order: str = "desc"
+    include_deleted: bool = False  # 新增字段
 
     @classmethod
     @field_validator('page_size')

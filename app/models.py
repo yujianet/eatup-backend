@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Index, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, Index, UniqueConstraint, Boolean
 from datetime import datetime
 from .database import Base
 
@@ -17,6 +17,7 @@ class Food(Base):
     expiry_days = Column(Integer)  # 保质期天数
     storage_time = Column(DateTime, default=datetime.now)
     photo_path = Column(String(200))  # 照片存储路径
+    is_deleted = Column(Boolean, default=False)  # 新增软删除字段
 
 
 class Category(Base):
