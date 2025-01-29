@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Food, Category
 from ..schemas.food import FoodResponse, FoodCreate, FoodQueryParams
+from ..config import settings
 
 router = APIRouter(prefix="/foods", tags=["foods"])
 
@@ -59,7 +60,7 @@ async def upload_image(file: UploadFile = File(...)):
     # 生成唯一文件名：时间戳_原文件名
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     filename = f"{timestamp}_{file.filename}"
-    save_path = f"static/uploads/{filename}"
+    save_path = f"{settings.UPLOAD_DIR}/{filename}"
 
     # 保存文件
     with open(save_path, "wb") as buffer:
