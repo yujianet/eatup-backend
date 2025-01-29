@@ -1,6 +1,5 @@
 from datetime import datetime
 from pydantic import BaseModel, field_validator, Field
-from sqlalchemy.orm import Session
 
 
 class FoodCreate(BaseModel):
