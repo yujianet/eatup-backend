@@ -1,3 +1,4 @@
+import logging
 import shutil
 from datetime import datetime, timedelta
 
@@ -12,6 +13,7 @@ from ..schemas.food import FoodResponse, FoodCreate, FoodQueryParams
 from ..config import settings
 
 router = APIRouter(prefix="/foods", tags=["foods"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/", status_code=201)
@@ -224,7 +226,21 @@ def update_food(
         db.rollback()
         raise HTTPException(500, f"数据库操作失败: {str(e)}")
 
-    return db_food
+    # 计算剩余天数
+    expiry_date = db_food.storage_time + timedelta(days=db_food.expiry_days)
+    remaining_days = (expiry_date - datetime.now()).days
+
+    # 返回包含 remaining_days 的 FoodResponse 对象
+    return FoodResponse(
+        id=db_food.id,
+        name=db_food.name,
+        category_large=db_food.category_large,
+        category_small=db_food.category_small,
+        expiry_days=db_food.expiry_days,
+        photo_path=db_food.photo_path,
+        storage_time=db_food.storage_time,
+        remaining_days=remaining_days
+    )
 
 
 @router.put("/{food_id}/undo_delete", response_model=FoodResponse)
@@ -244,14 +260,36 @@ def undo_delete_food(
 
     # 撤销软删除操作
     try:
+        logger.info(f"Undoing deletion for food ID {food_id}.")
         db_food.is_deleted = False  # 更新软删除字段
         db.commit()
+        logger.info(f"Food with ID {food_id} has been successfully undone deletion.")
         db.refresh(db_food)
+        logger.info(f"Food with ID {food_id} has been successfully refresh to undo deletion.")
     except OperationalError as e:
         db.rollback()
+        logger.error(f"OperationalError occurred while undoing deletion for food ID {food_id}: {str(e)}")
         raise HTTPException(500, f"数据库操作失败: {str(e)}")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"An unexpected error occurred while undoing deletion for food ID {food_id}: {str(e)}")
+        raise HTTPException(500, f"未知失败: {str(e)}")
 
-    return db_food
+    # 计算剩余天数
+    expiry_date = db_food.storage_time + timedelta(days=db_food.expiry_days)
+    remaining_days = (expiry_date - datetime.now()).days
+
+    # 返回包含 remaining_days 的 FoodResponse 对象
+    return FoodResponse(
+        id=db_food.id,
+        name=db_food.name,
+        category_large=db_food.category_large,
+        category_small=db_food.category_small,
+        expiry_days=db_food.expiry_days,
+        photo_path=db_food.photo_path,
+        storage_time=db_food.storage_time,
+        remaining_days=remaining_days
+    )
 
 
 @router.delete("/{food_id}")
