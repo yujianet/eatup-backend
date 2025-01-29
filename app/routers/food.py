@@ -186,6 +186,74 @@ def get_food_detail(
     )
 
 
+@router.put("/{food_id}", response_model=FoodResponse)
+def update_food(
+        food_id: int,
+        food_data: FoodCreate,
+        db: Session = Depends(get_db)
+):
+    """更新指定食物"""
+    # 查询食物是否存在
+    db_food = db.query(Food).filter(Food.id == food_id).first()
+    if not db_food:
+        raise HTTPException(status_code=404, detail="食物不存在")
+
+    # 验证分类是否存在
+    category = db.query(Category).filter(
+        Category.large_category == food_data.category_large,
+        Category.small_category == food_data.category_small
+    ).first()
+
+    if not category:
+        raise HTTPException(
+            status_code=400,
+            detail=f"无效分类组合"
+        )
+
+    # 更新食物记录
+    db_food.name = food_data.name
+    db_food.category_large = food_data.category_large
+    db_food.category_small = food_data.category_small
+    db_food.expiry_days = food_data.expiry_days
+    db_food.photo_path = food_data.photo_path
+
+    try:
+        db.commit()
+        db.refresh(db_food)
+    except OperationalError as e:
+        db.rollback()
+        raise HTTPException(500, f"数据库操作失败: {str(e)}")
+
+    return db_food
+
+
+@router.put("/{food_id}/undo_delete", response_model=FoodResponse)
+def undo_delete_food(
+        food_id: int,
+        db: Session = Depends(get_db)
+):
+    """撤销删除指定食物"""
+    # 查询食物是否存在
+    db_food = db.query(Food).filter(Food.id == food_id).first()
+    if not db_food:
+        raise HTTPException(status_code=404, detail="食物不存在")
+
+    # 检查食物是否已被删除
+    if not db_food.is_deleted:
+        raise HTTPException(status_code=400, detail="食物未被删除")
+
+    # 撤销软删除操作
+    try:
+        db_food.is_deleted = False  # 更新软删除字段
+        db.commit()
+        db.refresh(db_food)
+    except OperationalError as e:
+        db.rollback()
+        raise HTTPException(500, f"数据库操作失败: {str(e)}")
+
+    return db_food
+
+
 @router.delete("/{food_id}")
 def delete_food(
         food_id: int,
