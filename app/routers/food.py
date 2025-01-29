@@ -61,12 +61,13 @@ async def upload_image(file: UploadFile = File(...)):
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     filename = f"{timestamp}_{file.filename}"
     save_path = f"{settings.UPLOAD_DIR}/{filename}"
+    url_path = f"{settings.UPLOAD_URL_PREFIX}/{filename}"
 
     # 保存文件
     with open(save_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    return {"filename": filename, "path": save_path}
+    return {"filename": filename, "path": url_path}
 
 
 @router.get("/", summary="获取食物列表（分页排序）",

@@ -15,7 +15,7 @@ app = FastAPI()
 # 挂载子路由
 app.include_router(food.router)
 app.include_router(category.router)
-app.mount("/static", StaticFiles(directory=settings.UPLOAD_DIR), name="static")
+app.mount(settings.UPLOAD_URL_PREFIX, StaticFiles(directory=settings.UPLOAD_DIR), name="static")
 
 from fastapi.middleware.cors import CORSMiddleware
 
