@@ -16,25 +16,38 @@ router = APIRouter(prefix="/foods", tags=["foods"])
 logger = logging.getLogger(__name__)
 
 
+def get_food_by_id(food_id: int, db: Session):
+    return db.query(Food).filter(Food.id == food_id).first()
+
+
+def get_category_by_name(large_category: str, small_category: str, db: Session):
+    return db.query(Category).filter(
+        Category.large_category == large_category,
+        Category.small_category == small_category
+    ).first()
+
+
+def calculate_remaining_days(food: Food):
+    expiry_date = food.storage_time + timedelta(days=food.expiry_days)
+    return (expiry_date - datetime.now()).days
+
+
+def handle_database_exception(e: Exception, db: Session, message: str):
+    db.rollback()
+    logger.error(f"Error occurred: {str(e)}")
+    raise HTTPException(500, message)
+
+
 @router.post("/", status_code=201)
 def create_food(
         food_data: FoodCreate,
         db: Session = Depends(get_db)
 ):
     """创建食物"""
-    # 验证分类是否存在
-    category = db.query(Category).filter(
-        Category.large_category == food_data.category_large,
-        Category.small_category == food_data.category_small
-    ).first()
-
+    category = get_category_by_name(food_data.category_large, food_data.category_small, db)
     if not category:
-        raise HTTPException(
-            status_code=400,
-            detail=f"无效分类组合"
-        )
+        raise HTTPException(status_code=400, detail="无效分类组合")
 
-    # 创建食物记录
     db_food = Food(
         name=food_data.name,
         category_large=food_data.category_large,
@@ -45,8 +58,12 @@ def create_food(
     )
 
     db.add(db_food)
-    db.commit()
-    db.refresh(db_food)
+    try:
+        db.commit()
+        db.refresh(db_food)
+    except OperationalError as e:
+        handle_database_exception(e, db, "数据库操作失败")
+
     return db_food
 
 
@@ -166,15 +183,11 @@ def get_food_detail(
         db: Session = Depends(get_db)
 ):
     """获取单个食物详情"""
-    # 查询食物
-    db_food = db.query(Food).filter(Food.id == food_id).first()
-
+    db_food = get_food_by_id(food_id, db)
     if not db_food:
         raise HTTPException(status_code=404, detail="食物不存在")
 
-    # 计算剩余天数
-    expiry_date = db_food.storage_time + timedelta(days=db_food.expiry_days)
-    remaining_days = (expiry_date - datetime.now()).days
+    remaining_days = calculate_remaining_days(db_food)
 
     return FoodResponse(
         id=db_food.id,
@@ -195,24 +208,14 @@ def update_food(
         db: Session = Depends(get_db)
 ):
     """更新指定食物"""
-    # 查询食物是否存在
-    db_food = db.query(Food).filter(Food.id == food_id).first()
+    db_food = get_food_by_id(food_id, db)
     if not db_food:
         raise HTTPException(status_code=404, detail="食物不存在")
 
-    # 验证分类是否存在
-    category = db.query(Category).filter(
-        Category.large_category == food_data.category_large,
-        Category.small_category == food_data.category_small
-    ).first()
-
+    category = get_category_by_name(food_data.category_large, food_data.category_small, db)
     if not category:
-        raise HTTPException(
-            status_code=400,
-            detail=f"无效分类组合"
-        )
+        raise HTTPException(status_code=400, detail="无效分类组合")
 
-    # 更新食物记录
     db_food.name = food_data.name
     db_food.category_large = food_data.category_large
     db_food.category_small = food_data.category_small
@@ -223,14 +226,10 @@ def update_food(
         db.commit()
         db.refresh(db_food)
     except OperationalError as e:
-        db.rollback()
-        raise HTTPException(500, f"数据库操作失败: {str(e)}")
+        handle_database_exception(e, db, "数据库操作失败")
 
-    # 计算剩余天数
-    expiry_date = db_food.storage_time + timedelta(days=db_food.expiry_days)
-    remaining_days = (expiry_date - datetime.now()).days
+    remaining_days = calculate_remaining_days(db_food)
 
-    # 返回包含 remaining_days 的 FoodResponse 对象
     return FoodResponse(
         id=db_food.id,
         name=db_food.name,
@@ -249,37 +248,27 @@ def undo_delete_food(
         db: Session = Depends(get_db)
 ):
     """撤销删除指定食物"""
-    # 查询食物是否存在
-    db_food = db.query(Food).filter(Food.id == food_id).first()
+    db_food = get_food_by_id(food_id, db)
     if not db_food:
         raise HTTPException(status_code=404, detail="食物不存在")
 
-    # 检查食物是否已被删除
     if not db_food.is_deleted:
         raise HTTPException(status_code=400, detail="食物未被删除")
 
-    # 撤销软删除操作
     try:
         logger.info(f"Undoing deletion for food ID {food_id}.")
-        db_food.is_deleted = False  # 更新软删除字段
+        db_food.is_deleted = False
         db.commit()
         logger.info(f"Food with ID {food_id} has been successfully undone deletion.")
         db.refresh(db_food)
         logger.info(f"Food with ID {food_id} has been successfully refresh to undo deletion.")
     except OperationalError as e:
-        db.rollback()
-        logger.error(f"OperationalError occurred while undoing deletion for food ID {food_id}: {str(e)}")
-        raise HTTPException(500, f"数据库操作失败: {str(e)}")
+        handle_database_exception(e, db, "数据库操作失败")
     except Exception as e:
-        db.rollback()
-        logger.error(f"An unexpected error occurred while undoing deletion for food ID {food_id}: {str(e)}")
-        raise HTTPException(500, f"未知失败: {str(e)}")
+        handle_database_exception(e, db, "未知失败")
 
-    # 计算剩余天数
-    expiry_date = db_food.storage_time + timedelta(days=db_food.expiry_days)
-    remaining_days = (expiry_date - datetime.now()).days
+    remaining_days = calculate_remaining_days(db_food)
 
-    # 返回包含 remaining_days 的 FoodResponse 对象
     return FoodResponse(
         id=db_food.id,
         name=db_food.name,
@@ -298,17 +287,14 @@ def delete_food(
         db: Session = Depends(get_db)
 ):
     """删除指定食物"""
-    # 查询食物是否存在
-    db_food = db.query(Food).filter(Food.id == food_id).first()
+    db_food = get_food_by_id(food_id, db)
     if not db_food:
         raise HTTPException(status_code=404, detail="食物不存在")
 
-    # 执行软删除操作
     try:
-        db_food.is_deleted = True  # 更新软删除字段
+        db_food.is_deleted = True
         db.commit()
     except OperationalError as e:
-        db.rollback()
-        raise HTTPException(500, f"数据库操作失败: {str(e)}")
+        handle_database_exception(e, db, "数据库操作失败")
 
     return {"message": "食物删除成功"}
