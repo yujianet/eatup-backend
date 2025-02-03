@@ -8,7 +8,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
-from app.database.models import Food, Category
+from app.database.models import Food
 from app.schemas.food import FoodResponse, FoodCreate, FoodQueryParams
 from app.config import settings
 
@@ -18,13 +18,6 @@ logger = logging.getLogger(__name__)
 
 def get_food_by_id(food_id: int, db: Session):
     return db.query(Food).filter(Food.id == food_id).first()
-
-
-def get_category_by_name(large_category: str, small_category: str, db: Session):
-    return db.query(Category).filter(
-        Category.large_category == large_category,
-        Category.small_category == small_category
-    ).first()
 
 
 def calculate_remaining_days(food: Food):
@@ -44,14 +37,8 @@ def create_food(
         db: Session = Depends(get_db)
 ):
     """创建食物"""
-    category = get_category_by_name(food_data.category_large, food_data.category_small, db)
-    if not category:
-        raise HTTPException(status_code=400, detail="无效分类组合")
-
     db_food = Food(
         name=food_data.name,
-        category_large=food_data.category_large,
-        category_small=food_data.category_small,
         expiry_days=food_data.expiry_days,
         photo_path=food_data.photo_path,
         storage_time=datetime.now()
@@ -158,8 +145,6 @@ def get_foods(
         response_data.append(FoodResponse(
             id=food.id,
             name=food.name,
-            category_large=food.category_large,
-            category_small=food.category_small,
             expiry_days=food.expiry_days,
             photo_path=food.photo_path,
             storage_time=food.storage_time,
@@ -192,8 +177,6 @@ def get_food_detail(
     return FoodResponse(
         id=db_food.id,
         name=db_food.name,
-        category_large=db_food.category_large,
-        category_small=db_food.category_small,
         expiry_days=db_food.expiry_days,
         photo_path=db_food.photo_path,
         storage_time=db_food.storage_time,
@@ -212,13 +195,7 @@ def update_food(
     if not db_food:
         raise HTTPException(status_code=404, detail="食物不存在")
 
-    category = get_category_by_name(food_data.category_large, food_data.category_small, db)
-    if not category:
-        raise HTTPException(status_code=400, detail="无效分类组合")
-
     db_food.name = food_data.name
-    db_food.category_large = food_data.category_large
-    db_food.category_small = food_data.category_small
     db_food.expiry_days = food_data.expiry_days
     db_food.photo_path = food_data.photo_path
 
@@ -233,8 +210,6 @@ def update_food(
     return FoodResponse(
         id=db_food.id,
         name=db_food.name,
-        category_large=db_food.category_large,
-        category_small=db_food.category_small,
         expiry_days=db_food.expiry_days,
         photo_path=db_food.photo_path,
         storage_time=db_food.storage_time,
@@ -272,8 +247,6 @@ def undo_delete_food(
     return FoodResponse(
         id=db_food.id,
         name=db_food.name,
-        category_large=db_food.category_large,
-        category_small=db_food.category_small,
         expiry_days=db_food.expiry_days,
         photo_path=db_food.photo_path,
         storage_time=db_food.storage_time,
