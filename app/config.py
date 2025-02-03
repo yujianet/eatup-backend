@@ -23,7 +23,7 @@ class TestSettings(BaseSettings):
     AI_IMAGE_API_KEY: str = "sk-37744c431af14ae9bd964490b0d8d652"
     AI_IMAGE_MODEL: str = "qwen2.5-vl-3b-instruct"
 
-if getenv("TESTING", "False"):
+if getenv("TESTING", "True"):
     settings = TestSettings()
     print("Running in test mode")
 else:
