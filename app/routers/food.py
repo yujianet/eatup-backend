@@ -7,10 +7,10 @@ from sqlalchemy import desc, func
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from ..database import get_db
-from ..models import Food, Category
-from ..schemas.food import FoodResponse, FoodCreate, FoodQueryParams
-from ..config import settings
+from app.database.database import get_db
+from app.database.models import Food, Category
+from app.schemas.food import FoodResponse, FoodCreate, FoodQueryParams
+from app.config import settings
 
 router = APIRouter(prefix="/foods", tags=["foods"])
 logger = logging.getLogger(__name__)

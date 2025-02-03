@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, Index, UniqueConstraint, Boolean
 from datetime import datetime
+
 from .database import Base
 
 

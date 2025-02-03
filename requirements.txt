@@ -4,3 +4,6 @@ pydantic_settings~=2.7.1
 SQLAlchemy~=2.0.37
 python-multipart~=0.0.20
 uvicorn~=0.34.0
+openai~=1.61.0
+pydantic_core~=2.27.2
+pydantic-settings~=2.7.1

@@ -1,6 +1,6 @@
 /.venv/
 /test.db
 /.idea/
-/static/uploads/
+/static/
 /migrations/
 /alembic.ini
