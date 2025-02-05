@@ -4,3 +4,4 @@
 /static/
 /migrations/
 /alembic.ini
+**/*.pyc
