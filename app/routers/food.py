@@ -141,6 +141,14 @@ def get_foods(
     for food in foods:
         expiry_date = food.storage_time + timedelta(days=food.expiry_days)
         remaining_days = (expiry_date - datetime.now()).days
+        remaining_percent = remaining_days / food.expiry_days
+        if remaining_percent < 0:
+            remaining_level = 0
+        elif remaining_percent < 0.1 or remaining_days < 2:
+            remaining_level = 1
+        else:
+            remaining_level = 2
+
 
         response_data.append(FoodResponse(
             id=food.id,
@@ -148,7 +156,8 @@ def get_foods(
             expiry_days=food.expiry_days,
             photo_path=food.photo_path,
             storage_time=food.storage_time,
-            remaining_days=remaining_days
+            remaining_days=remaining_days,
+            remaining_level=remaining_level
         ))
 
     return {

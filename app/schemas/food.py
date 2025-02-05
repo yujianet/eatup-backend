@@ -12,6 +12,7 @@ class FoodResponse(FoodCreate):
     id: int
     storage_time: datetime
     remaining_days: int
+    remaining_level: int
 
 
 class FoodQueryParams(BaseModel):
