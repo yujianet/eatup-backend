@@ -3,13 +3,13 @@ from pydantic import BaseModel, field_validator, Field
 
 
 class FoodCreate(BaseModel):
-    name: str = Field(..., description="食物名称")
+    food_name: str = Field(..., description="食物名称")
     expiry_days: int
     photo_path: str
 
 
 class FoodResponse(FoodCreate):
-    id: int
+    food_id: int
     storage_time: datetime
     remaining_days: int
     remaining_level: int

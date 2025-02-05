@@ -38,7 +38,7 @@ def create_food(
 ):
     """创建食物"""
     db_food = Food(
-        name=food_data.name,
+        name=food_data.food_name,
         expiry_days=food_data.expiry_days,
         photo_path=food_data.photo_path,
         storage_time=datetime.now()
@@ -142,7 +142,7 @@ def get_foods(
         expiry_date = food.storage_time + timedelta(days=food.expiry_days)
         remaining_days = (expiry_date - datetime.now()).days
         remaining_percent = remaining_days / food.expiry_days
-        if remaining_percent < 0:
+        if remaining_percent <= 0:
             remaining_level = 0
         elif remaining_percent < 0.1 or remaining_days < 2:
             remaining_level = 1
@@ -151,8 +151,8 @@ def get_foods(
 
 
         response_data.append(FoodResponse(
-            id=food.id,
-            name=food.name,
+            food_id=food.id,
+            food_name=food.name,
             expiry_days=food.expiry_days,
             photo_path=food.photo_path,
             storage_time=food.storage_time,
@@ -184,8 +184,8 @@ def get_food_detail(
     remaining_days = calculate_remaining_days(db_food)
 
     return FoodResponse(
-        id=db_food.id,
-        name=db_food.name,
+        food_id=db_food.id,
+        food_name=db_food.name,
         expiry_days=db_food.expiry_days,
         photo_path=db_food.photo_path,
         storage_time=db_food.storage_time,
@@ -204,7 +204,7 @@ def update_food(
     if not db_food:
         raise HTTPException(status_code=404, detail="食物不存在")
 
-    db_food.name = food_data.name
+    db_food.name = food_data.food_name
     db_food.expiry_days = food_data.expiry_days
     db_food.photo_path = food_data.photo_path
 
@@ -217,8 +217,8 @@ def update_food(
     remaining_days = calculate_remaining_days(db_food)
 
     return FoodResponse(
-        id=db_food.id,
-        name=db_food.name,
+        food_id=db_food.id,
+        food_name=db_food.name,
         expiry_days=db_food.expiry_days,
         photo_path=db_food.photo_path,
         storage_time=db_food.storage_time,
@@ -254,8 +254,8 @@ def undo_delete_food(
     remaining_days = calculate_remaining_days(db_food)
 
     return FoodResponse(
-        id=db_food.id,
-        name=db_food.name,
+        food_id=db_food.id,
+        food_name=db_food.name,
         expiry_days=db_food.expiry_days,
         photo_path=db_food.photo_path,
         storage_time=db_food.storage_time,
