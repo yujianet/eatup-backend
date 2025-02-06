@@ -134,9 +134,9 @@ def get_foods(
 
     # 处理结果集
     if query.sort_by == "remaining_days":
-        foods = [row[0] for row in result]
+        foods: list[type[Food|None]] = [row[0] for row in result]
     else:
-        foods = result
+        foods: list[type[Food|None]] = result
 
     # 获取总数（需要独立查询）
     total_query = db.query(func.count(Food.id))
@@ -200,7 +200,7 @@ def update_food(
         db: Session = Depends(get_db)
 ):
     """更新指定食物"""
-    db_food = get_food_by_id(food_id, db)
+    db_food: Food | None = get_food_by_id(food_id, db)
     if not db_food:
         raise HTTPException(status_code=404, detail="食物不存在")
 
@@ -233,7 +233,7 @@ def undo_delete_food(
         db: Session = Depends(get_db)
 ):
     """撤销删除指定食物"""
-    db_food = get_food_by_id(food_id, db)
+    db_food: Food | None = get_food_by_id(food_id, db)
     if not db_food:
         raise HTTPException(status_code=404, detail="食物不存在")
 
@@ -252,7 +252,7 @@ def undo_delete_food(
     except Exception as e:
         handle_database_exception(e, db, "未知失败")
 
-    remaining_days = calculate_remaining_days(db_food)
+    remaining_days, remaining_level = calculate_remaining_days(db_food)
 
     return FoodResponse(
         food_id=db_food.id,
