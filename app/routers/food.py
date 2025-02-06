@@ -20,9 +20,17 @@ def get_food_by_id(food_id: int, db: Session):
     return db.query(Food).filter(Food.id == food_id).first()
 
 
-def calculate_remaining_days(food: Food):
+def calculate_remaining_days(food: Food) -> (int, int) :
     expiry_date = food.storage_time + timedelta(days=food.expiry_days)
-    return (expiry_date - datetime.now()).days
+    remaining_days = (expiry_date - datetime.now()).days
+    remaining_percent = remaining_days / food.expiry_days
+    if remaining_percent <= 0:
+        remaining_level = 0
+    elif remaining_percent < 0.1 or remaining_days < 2:
+        remaining_level = 1
+    else:
+        remaining_level = 2
+    return remaining_days, remaining_level
 
 
 def handle_database_exception(e: Exception, db: Session, message: str):
@@ -139,16 +147,7 @@ def get_foods(
     # 将SQLAlchemy模型转换为Pydantic响应模型
     response_data = []
     for food in foods:
-        expiry_date = food.storage_time + timedelta(days=food.expiry_days)
-        remaining_days = (expiry_date - datetime.now()).days
-        remaining_percent = remaining_days / food.expiry_days
-        if remaining_percent <= 0:
-            remaining_level = 0
-        elif remaining_percent < 0.1 or remaining_days < 2:
-            remaining_level = 1
-        else:
-            remaining_level = 2
-
+        remaining_days, remaining_level = calculate_remaining_days(food)
 
         response_data.append(FoodResponse(
             food_id=food.id,
@@ -177,11 +176,11 @@ def get_food_detail(
         db: Session = Depends(get_db)
 ):
     """获取单个食物详情"""
-    db_food = get_food_by_id(food_id, db)
-    if not db_food:
+    db_food: Food | None = get_food_by_id(food_id, db)
+    if db_food is None:
         raise HTTPException(status_code=404, detail="食物不存在")
 
-    remaining_days = calculate_remaining_days(db_food)
+    remaining_days, remaining_level = calculate_remaining_days(db_food)
 
     return FoodResponse(
         food_id=db_food.id,
@@ -189,7 +188,8 @@ def get_food_detail(
         expiry_days=db_food.expiry_days,
         photo_path=db_food.photo_path,
         storage_time=db_food.storage_time,
-        remaining_days=remaining_days
+        remaining_days=remaining_days,
+        remaining_level=remaining_level
     )
 
 
@@ -214,7 +214,7 @@ def update_food(
     except OperationalError as e:
         handle_database_exception(e, db, "数据库操作失败")
 
-    remaining_days = calculate_remaining_days(db_food)
+    remaining_days, remaining_level = calculate_remaining_days(db_food)
 
     return FoodResponse(
         food_id=db_food.id,
@@ -222,7 +222,8 @@ def update_food(
         expiry_days=db_food.expiry_days,
         photo_path=db_food.photo_path,
         storage_time=db_food.storage_time,
-        remaining_days=remaining_days
+        remaining_days=remaining_days,
+        remaining_level=remaining_level
     )
 
 
@@ -259,7 +260,8 @@ def undo_delete_food(
         expiry_days=db_food.expiry_days,
         photo_path=db_food.photo_path,
         storage_time=db_food.storage_time,
-        remaining_days=remaining_days
+        remaining_days=remaining_days,
+        remaining_level=remaining_level
     )
 
 
