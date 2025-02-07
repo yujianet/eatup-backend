@@ -15,12 +15,10 @@ from app.config import settings
 router = APIRouter(prefix="/foods", tags=["foods"])
 logger = logging.getLogger(__name__)
 
-
 def get_food_by_id(food_id: int, db: Session):
     return db.query(Food).filter(Food.id == food_id).first()
 
-
-def calculate_remaining_days(food: Food) -> (int, int) :
+def calculate_remaining_days(food: Food) -> (int, int):
     expiry_date = food.storage_time + timedelta(days=food.expiry_days)
     remaining_days = (expiry_date - datetime.now()).days
     remaining_percent = remaining_days / food.expiry_days
@@ -32,12 +30,10 @@ def calculate_remaining_days(food: Food) -> (int, int) :
         remaining_level = 2
     return remaining_days, remaining_level
 
-
 def handle_database_exception(e: Exception, db: Session, message: str):
     db.rollback()
     logger.error(f"Error occurred: {str(e)}")
     raise HTTPException(500, message)
-
 
 @router.post("/", status_code=201)
 def create_food(
@@ -61,10 +57,8 @@ def create_food(
 
     return db_food
 
-
 # 新增图片上传接口
 ALLOWED_TYPES = ["image/jpeg", "image/png"]
-
 
 @router.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
@@ -83,8 +77,7 @@ async def upload_image(file: UploadFile = File(...)):
 
     return {"filename": filename, "path": url_path}
 
-
-@router.get("/", summary="获取食物列表（分页排序）",
+@router.get("/", summary="获取食物列表（偏移量+数量）",
             description="支持排序字段：storage_time（入库时间）, expiry_days（保质期天数）, remaining_days（剩余天数）")
 def get_foods(
         query: FoodQueryParams = Depends(),
@@ -120,13 +113,13 @@ def get_foods(
         column = getattr(Food, query.sort_by)
         order_clause = desc(column) if query.order == "desc" else column.asc()
 
-    # 执行分页查询
+    # 执行查询
     try:
         result = (
             base_query
             .order_by(order_clause)
-            .offset((query.page - 1) * query.page_size)
-            .limit(query.page_size)
+            .offset(query.offset)  # 修改: 使用 offset 参数
+            .limit(query.limit)  # 修改: 使用 limit 参数
             .all()
         )
     except OperationalError as e:
@@ -163,12 +156,10 @@ def get_foods(
         "data": response_data,
         "pagination": {
             "total": total,
-            "page": query.page,
-            "page_size": query.page_size,
-            "total_pages": (total + query.page_size - 1) // query.page_size
+            "offset": query.offset,
+            "limit": query.limit,
         }
     }
-
 
 @router.get("/{food_id}", response_model=FoodResponse)
 def get_food_detail(
@@ -191,7 +182,6 @@ def get_food_detail(
         remaining_days=remaining_days,
         remaining_level=remaining_level
     )
-
 
 @router.put("/{food_id}", response_model=FoodResponse)
 def update_food(
@@ -225,7 +215,6 @@ def update_food(
         remaining_days=remaining_days,
         remaining_level=remaining_level
     )
-
 
 @router.put("/{food_id}/undo_delete", response_model=FoodResponse)
 def undo_delete_food(
@@ -263,7 +252,6 @@ def undo_delete_food(
         remaining_days=remaining_days,
         remaining_level=remaining_level
     )
-
 
 @router.delete("/{food_id}")
 def delete_food(
